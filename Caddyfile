@@ -1,4 +1,4 @@
-loyalty.luba.skin
+loyaltydonotddosme.luba.skin
 
 handle_path /docs* {
     reverse_proxy "http://swagger-ui:8080"
