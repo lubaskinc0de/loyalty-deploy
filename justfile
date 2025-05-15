@@ -1,6 +1,6 @@
 up:
     just down
-    docker compose up -d
+    docker compose up
 
 down:
     docker compose down

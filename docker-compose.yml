@@ -10,12 +10,13 @@ services:
             - caddy_data:/data
             - caddy_config:/config
             - static_volume:/var/www/loyalty/static
-        depends_on:
-            - api
-            - swagger-ui
         healthcheck:
-            test: ["CMD", "curl", "-f", "https://localhost/ping/"]
+            test: ["CMD", "nc", "-z", "localhost", "443"]
             interval: 4s
+            timeout: 2s
+        depends_on:
+            api:
+                condition: service_healthy
 
     swagger-ui:
         image: swaggerapi/swagger-ui
@@ -28,7 +29,8 @@ services:
         volumes:
             - ./openapi.yml:/var/www/static/openapi.yml
         depends_on:
-            - api
+            caddy:
+                condition: service_healthy
 
     api:
         container_name: api
@@ -48,6 +50,10 @@ services:
                 condition: service_started
         labels:
             - "com.centurylinklabs.watchtower.enable=true"
+        healthcheck:
+            test: ["CMD", "curl", "http://localhost:5000/ping/"]
+            interval: 4s
+            timeout: 2s
 
     db:
         container_name: db
@@ -102,7 +108,8 @@ services:
         environment:
             - WATCHTOWER_LABEL_ENABLE=true
         depends_on:
-            - api
+            api:
+                condition: service_healthy
 
 volumes:
     pg_data:
