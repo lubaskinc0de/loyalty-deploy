@@ -1,0 +1,112 @@
+services:
+    caddy:
+        image: caddy:2.10.0
+        restart: on-failure
+        container_name: caddy
+        ports:
+            - "443:443"
+        volumes:
+            - ./Caddyfile:/etc/caddy/Caddyfile
+            - caddy_data:/data
+            - caddy_config:/config
+            - static_volume:/var/www/loyalty/static
+        depends_on:
+            - api
+            - swagger-ui
+        healthcheck:
+            test: ["CMD", "curl", "-f", "https://localhost/ping/"]
+            interval: 4s
+
+    swagger-ui:
+        image: swaggerapi/swagger-ui
+        restart: on-failure
+        container_name: swagger
+        expose:
+            - 8080
+        environment:
+            - SWAGGER_JSON=/var/www/static/openapi.yml
+        volumes:
+            - ./openapi.yml:/var/www/static/openapi.yml
+        depends_on:
+            - api
+
+    api:
+        container_name: api
+        command: ["crudik", "run", "api"]
+        restart: on-failure
+        image: ghcr.io/lubaskinc0de/loyalty:latest
+        env_file:
+            - "./.env"
+        expose:
+            - 5000
+        volumes:
+            - static_volume:/home/app/src/loyalty/presentation/web/static
+        depends_on:
+            db:
+                condition: service_healthy
+            nginx-s3-gateway:
+                condition: service_started
+        labels:
+            - "com.centurylinklabs.watchtower.enable=true"
+
+    db:
+        container_name: db
+        image: postgis/postgis:14-3.5-alpine
+        restart: on-failure
+        env_file:
+            - ./.env.pg
+        volumes:
+            - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+            - pg_data:/var/lib/postgresql/data/
+        expose:
+            - 5432
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U postgres"]
+            interval: 2s
+
+    minio:
+        image: minio/minio:RELEASE.2025-04-22T22-12-26Z-cpuv1
+        restart: on-failure
+        container_name: minio
+        command: server /data
+        expose:
+            - 9000
+        env_file:
+            - ./.env.minio
+        healthcheck:
+            test:
+                ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+            interval: 2s
+        volumes:
+            - minio_data:/data
+
+    nginx-s3-gateway:
+        image: ghcr.io/nginxinc/nginx-s3-gateway/nginx-oss-s3-gateway:latest-njs-oss-20220310
+        restart: on-failure
+        container_name: nginx-s3-gateway
+        env_file:
+            - ./.env.minio
+        expose:
+            - 80
+        depends_on:
+            minio:
+                condition: service_healthy
+
+    watchtower:
+        container_name: watchtower
+        image: containrrr/watchtower:1.7.1
+        restart: unless-stopped
+        volumes:
+            - /var/run/docker.sock:/var/run/docker.sock
+        command: --interval 300 --cleanup --label-enable
+        environment:
+            - WATCHTOWER_LABEL_ENABLE=true
+        depends_on:
+            - api
+
+volumes:
+    pg_data:
+    static_volume:
+    minio_data:
+    caddy_data:
+    caddy_config:

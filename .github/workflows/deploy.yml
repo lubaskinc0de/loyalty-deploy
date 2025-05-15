@@ -1,0 +1,33 @@
+name: Deploy to Server
+
+on:
+    push:
+        branches: [master]
+
+jobs:
+    deploy:
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Install SSH key
+              uses: shimataro/ssh-key-action@v2
+              with:
+                  key: ${{ secrets.SSH_PRIVATE_KEY }}
+                  known_hosts: "just-a-placeholder-so-we-dont-get-errors"
+
+            - name: Copy files via rsync
+              run: |
+                  rsync -avz -e "ssh -p ${{ secrets.SSH_PORT }} -o StrictHostKeyChecking=no" \
+                    --exclude='.github/workflows/' \
+                    --exclude='.git/' \
+                    ./ ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }}:${{ secrets.TARGET_DIR }}/
+
+            - name: Reload app
+              run: |
+                  ssh -p ${{ secrets.SSH_PORT }} \
+                      -o StrictHostKeyChecking=no \
+                      ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} \
+                      "cd ${{ secrets.TARGET_DIR }} && just up"

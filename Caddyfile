@@ -1,0 +1,21 @@
+loyalty.luba.skin
+
+handle_path /docs* {
+    reverse_proxy http://swagger-ui:8080
+}
+
+handle_path /staticfiles/* {
+    root * /var/www/loyalty/static
+    file_server
+}
+
+handle_path /files/* {
+    reverse_proxy http://nginx-s3-gateway
+}
+
+handle {
+    request_body {
+		max_size 2MB
+	}
+    reverse_proxy http://api:5000
+}
